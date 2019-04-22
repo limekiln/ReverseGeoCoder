@@ -1,13 +1,17 @@
 import csv
 import sys
 import os
+import logging
+import time
+import traceback
 
 from pathlib import Path
 
 from locationiq.geocoder import LocationIQ
 from locationiq.geocoder import LocationIqInvalidKey, LocationIqNoPlacesFound, LocationIqRequestLimitExeceeded
 
-SAVE_DIRECTORY = Path(sys.path[0]).joinpath(Path("location_report.csv"))
+logging.getLogger().setLevel(logging.INFO)
+SAVE_DIRECTORY = Path(sys.path[0]).joinpath(Path("Reports", "location_report.csv"))
 
 
 def set_save_directory(directory):
@@ -20,13 +24,13 @@ def check_arguments(args):
     if len(args) < 2:
         sys.exit('No argument was given, please provide a .csv file!')
     if len(args) < 3:
-        print(f"No target location for report creation selected. Using default: {SAVE_DIRECTORY}")
+        logging.info(f"No target location for report creation selected. Using default: {SAVE_DIRECTORY}")
     else:
         target = Path(args[2])
         if not target.suffix == ".csv":
             sys.exit("Invalid path for report creation. Target has to be a .csv file!")
         else:
-            print(f"Report location set to {SAVE_DIRECTORY}.")
+            logging.info(f"Report location set to {SAVE_DIRECTORY}.")
             set_save_directory(target)
 
     file = Path(args[1])
@@ -34,7 +38,7 @@ def check_arguments(args):
         sys.exit('No valid .csv file found!')
 
 
-def init_report_file(report):
+def init_report_file():
     # delete file if existing and environment variable OVERRIDE is set to true
     if os.getenv('OVERRIDE') == 'true' and SAVE_DIRECTORY.is_file():
         os.remove(SAVE_DIRECTORY)
@@ -59,47 +63,53 @@ def execute_reverse_geo_coding(source, geoCoder):
         csvReader = csv.reader(csvFile, delimiter=' ', quotechar='|')
         next(csvReader, None)  # ignore the header
         for row in csvReader:
+            time.sleep(1)
             try:
                 location = geoCoder.reverse_geocode(*row)
                 postalCode = location['address']['postcode']
                 validLocations.append((row[0], row[1], postalCode))
-                print(f"Found postal code {postalCode} for {row[0]} {row[1]}")
+                logging.info(f"Found postal code {postalCode} for {row[0]} {row[1]}")
             except LocationIqInvalidKey:
                 sys.exit("The given API key is invalid!")
             except LocationIqNoPlacesFound:
-                print(f"No places found for {row[0]} {row[1]}. Skipping...")
+                logging.warning(f"No places found for {row[0]} {row[1]}. Skipping...")
                 continue
             except LocationIqRequestLimitExeceeded:
-                print("Request limit exceeded. Skipping ...")
-                continue
+                logging.warning("Request limit exceeded. Skipping all remaining coordinates ...")
+                break
             except KeyError:
-                print(f"No postal code found for {row[0]} {row[1]}. Skipping...")
+                logging.warning(f"No postal code found for {row[0]} {row[1]}. Skipping...")
                 continue
+            except Exception as e:
+                logging.error(
+                    f"An unexpected error occurred during reverse geo coding: ${traceback.print_tb(e.__traceback__)}")
 
     return validLocations
 
 
 def write_results():
-    print("Writing locations to report file ...")
+    logging.info("Writing locations to report file ...")
     try:
         for location in validLocations:
             with open(SAVE_DIRECTORY, 'a', newline='') as reportFile:
                 csvWriter = csv.writer(reportFile, delimiter=' ', quotechar='|', quoting=csv.QUOTE_MINIMAL)
                 csvWriter.writerow(location)
     except Exception as e:
-        print(e)
+        logging.error(f"An unexpected error occurred while writing the report: ${traceback.print_tb(e.__traceback__)}")
         return
-    print(f"... done! Report located at {SAVE_DIRECTORY}.")
+    logging.info(f"... done! Report located at {SAVE_DIRECTORY}.")
 
 
 if __name__ == '__main__':
+    logging.info("Start reverse geo coding...")
+
     # validation check for command line arguments
     check_arguments(sys.argv)
 
     inputFile = sys.argv[1]
 
     # create file and write header
-    init_report_file(inputFile)
+    init_report_file()
 
     # initialize geo coder with API key -> does not throw on invalid key, but on a missing one
     geoCoder = get_locationiq_geo_coder()

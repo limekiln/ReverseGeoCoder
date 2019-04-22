@@ -57,22 +57,27 @@ def get_locationiq_geo_coder():
 
 
 def execute_reverse_geo_coding(source, geoCoder):
-    validLocations = []
+    locations = []
+    try:
+        sleepTimer = os.environ["sleepTimer"]
+    except KeyError:
+        sleepTimer = 1
+        logging.info("No value for sleep timer found, setting to 1 ...")
+
     # iterate through csv file and do reverse geo coding calls
     with open(source, newline='') as csvFile:
         csvReader = csv.reader(csvFile, delimiter=' ', quotechar='|')
         next(csvReader, None)  # ignore the header
+        logging.info("Starting address calculation ...")
         for row in csvReader:
-            time.sleep(1)
+            time.sleep(sleepTimer)
             try:
-                location = geoCoder.reverse_geocode(*row)
-                postalCode = location['address']['postcode']
-                validLocations.append((row[0], row[1], postalCode))
-                logging.info(f"Found postal code {postalCode} for {row[0]} {row[1]}")
+                location = geoCoder.reverse_geocode(*row)['address']
+                locations.append(location)
             except LocationIqInvalidKey:
                 sys.exit("The given API key is invalid!")
             except LocationIqNoPlacesFound:
-                logging.warning(f"No places found for {row[0]} {row[1]}. Skipping...")
+                logging.warning(f"No place found for {row[0]} {row[1]}. Skipping...")
                 continue
             except LocationIqRequestLimitExeceeded:
                 logging.warning("Request limit exceeded. Skipping all remaining coordinates ...")
@@ -84,19 +89,16 @@ def execute_reverse_geo_coding(source, geoCoder):
                 logging.error(
                     f"An unexpected error occurred during reverse geo coding: ${traceback.print_tb(e.__traceback__)}")
 
-    return validLocations
+    return locations
 
 
-def write_results():
+def write_results(locations):
     logging.info("Writing locations to report file ...")
-    try:
-        for location in validLocations:
-            with open(SAVE_DIRECTORY, 'a', newline='') as reportFile:
-                csvWriter = csv.writer(reportFile, delimiter=' ', quotechar='|', quoting=csv.QUOTE_MINIMAL)
-                csvWriter.writerow(location)
-    except Exception as e:
-        logging.error(f"An unexpected error occurred while writing the report: ${traceback.print_tb(e.__traceback__)}")
-        return
+    keys = set().union(*(location.keys() for location in locations))  # get all keys from dicts
+    with open(SAVE_DIRECTORY, 'w') as output_file:
+        dict_writer = csv.DictWriter(output_file, keys)
+        dict_writer.writeheader()
+        dict_writer.writerows(locations)
     logging.info(f"... done! Report located at {SAVE_DIRECTORY}.")
 
 
@@ -114,8 +116,10 @@ if __name__ == '__main__':
     # initialize geo coder with API key -> does not throw on invalid key, but on a missing one
     geoCoder = get_locationiq_geo_coder()
 
-    # array to contain valid locations (independent of postal code existence)
+    # array to contain valid locations
     validLocations = execute_reverse_geo_coding(inputFile, geoCoder)
 
     # Write results to report at SAVE_DIRECTORY
-    write_results()
+    write_results(validLocations)
+
+    logging.info("Execution finished!")

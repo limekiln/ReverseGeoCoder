@@ -9,7 +9,9 @@ from pathlib import Path
 
 from locationiq.geocoder import LocationIQ
 from locationiq.geocoder import LocationIqInvalidKey, LocationIqNoPlacesFound, LocationIqRequestLimitExeceeded
+from dotenv import load_dotenv
 
+load_dotenv()
 logging.getLogger().setLevel(logging.INFO)
 SAVE_DIRECTORY = Path(sys.path[0]).joinpath(Path("Reports", "location_report.csv"))
 
@@ -59,9 +61,9 @@ def get_locationiq_geo_coder():
 def execute_reverse_geo_coding(source, geoCoder):
     locations = []
     try:
-        sleepTimer = os.environ["sleepTimer"]
+        sleepTimer = int(os.environ["SLEEP_TIMER"])
     except KeyError:
-        sleepTimer = 1
+        sleepTimer = 0
         logging.info("No value for sleep timer found, setting to 1 ...")
 
     # iterate through csv file and do reverse geo coding calls
@@ -73,6 +75,7 @@ def execute_reverse_geo_coding(source, geoCoder):
             time.sleep(sleepTimer)
             try:
                 location = geoCoder.reverse_geocode(*row)['address']
+                location.update(latitude=row[0], longitude=row[1])
                 locations.append(location)
             except LocationIqInvalidKey:
                 sys.exit("The given API key is invalid!")

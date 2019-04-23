@@ -1,13 +1,23 @@
 # LocationIQ Reverse GeoCoder
+
 ## What is it?
-This script uses the locationIQ API to extract the postal code (if existent) from a pair of
-latitude and longitude coordinates (more information to be extracted).
+This script uses the locationIQ API to extract address information from a pair of
+latitude and longitude coordinates and saves it as a .csv report.
 
 ## Configuration
-tbd
+There is a minimal configuration to be done using the .env file.
+- `LOCATIONIQ_API_KEY`: Key used for geo-queries 
+- `OVERRIDE`: Whether or not an existing report file should be overwritten (default: true)
+- `SLEEP_TIMER`: Back-off-timer after a failed query to prevent too many queries in a too short time frame 
 
 ## Usage
 ### CLI
-tbd
+`python GeoCoder.py <input.csv> [output.csv]`
+
+### Executable
+`path/to/GeoCoder <input.csv> [output.csv]`
+
 ### Docker
-tbd
+`docker container run --env-file .env 
+-v GeoCoder:/Reports -v </path/to/input.csv:/input.csv> 
+reverse_geo_coder <input.csv>`

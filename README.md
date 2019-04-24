@@ -9,6 +9,8 @@ There is a minimal configuration to be done using the .env file.
 - `LOCATIONIQ_API_KEY`: Key used for geo-queries 
 - `OVERRIDE`: Whether or not an existing report file should be overwritten (default: true)
 - `SLEEP_TIMER`: Back-off-timer after a failed query to prevent too many queries in a too short time frame 
+- `DELIMITER_IN`: Delimiter used in input .csv file
+- `DELIMITER_OUT`: Delimiter which should be used for writing the report .csv file
 
 ## Usage
 ### CLI

@@ -40,19 +40,9 @@ def check_arguments(args):
         sys.exit('No valid .csv file found!')
 
 
-def init_report_file():
-    # delete file if existing and environment variable OVERRIDE is set to true
-    if os.getenv('OVERRIDE') == 'true' and SAVE_DIRECTORY.is_file():
-        os.remove(SAVE_DIRECTORY)
-
-    with open(SAVE_DIRECTORY, 'a', newline='') as reportFile:
-        csvWriter = csv.writer(reportFile, delimiter=' ', quotechar='|', quoting=csv.QUOTE_MINIMAL)
-        csvWriter.writerow(["Latitude", "Longitude", "Postal_Code"])
-
-
 def get_locationiq_geo_coder():
     try:
-        apiKey = os.environ['LOCATIONIQ_API_KEY']
+        apiKey = os.environ["LOCATIONIQ_API_KEY"]
         return LocationIQ(apiKey)
     except KeyError:
         sys.exit('Could not find API key in environment variables!')
@@ -68,7 +58,7 @@ def execute_reverse_geo_coding(source, geoCoder):
 
     # iterate through csv file and do reverse geo coding calls
     with open(source, newline='') as csvFile:
-        csvReader = csv.reader(csvFile, delimiter=' ', quotechar='|')
+        csvReader = csv.reader(csvFile, delimiter=os.environ["DELIMITER_IN"], quotechar='|')
         next(csvReader, None)  # ignore the header
         logging.info("Starting address calculation ...")
         for row in csvReader:
@@ -99,7 +89,7 @@ def write_results(locations):
     logging.info("Writing locations to report file ...")
     keys = set().union(*(location.keys() for location in locations))  # get all keys from dicts
     with open(SAVE_DIRECTORY, 'w') as output_file:
-        dict_writer = csv.DictWriter(output_file, keys)
+        dict_writer = csv.DictWriter(output_file, keys, delimiter=os.environ["DELIMITER_OUT"])
         dict_writer.writeheader()
         dict_writer.writerows(locations)
     logging.info(f"... done! Report located at {SAVE_DIRECTORY}.")
@@ -112,9 +102,6 @@ if __name__ == '__main__':
     check_arguments(sys.argv)
 
     inputFile = sys.argv[1]
-
-    # create file and write header
-    init_report_file()
 
     # initialize geo coder with API key -> does not throw on invalid key, but on a missing one
     geoCoder = get_locationiq_geo_coder()
